@@ -13,6 +13,10 @@ pipeline {
         string(name: 'APP_PORT', defaultValue: '8081', description: 'Order API port on the Windows agent')
     }
 
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
     stages {
         stage('Checkout GitHub') {
             steps { checkout scm }
@@ -41,7 +45,7 @@ pipeline {
             steps {
                 powershell '''
                     $ErrorActionPreference = 'Stop'
-                    & .\scripts\Deploy-OrderApi.ps1 -Port ([int]$env:APP_PORT) -DeployDirectory "$env:WORKSPACE@deploy"
+                    & ./scripts/Deploy-OrderApi.ps1 -Port ([int]$env:APP_PORT) -DeployDirectory "$env:WORKSPACE@deploy"
                 '''
             }
         }
