@@ -37,11 +37,27 @@ if (Test-Path -LiteralPath $pidPath) {
 }
 
 $app = $null
+$launcher = $null
 try {
     Copy-Item -LiteralPath $artifacts[0].FullName -Destination $jarPath -Force
-    $app = Start-Process -FilePath $java -ArgumentList @('-jar', ('"' + $jarPath + '"'), "--server.port=$Port") `
-        -WorkingDirectory $deployRoot -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    # Redirect all three streams in a separate hidden console. PowerShell's
+    # asynchronous output redirection can keep the Jenkins step attached to Java.
+    foreach ($path in @($java, $jarPath, $stdoutPath, $stderrPath)) {
+        if ($path -match '[%"\r\n]') { throw 'Deployment paths must not contain percent signs, quotes or newlines.' }
+    }
+    $command = '""{0}" -jar "{1}" --server.port={2} <NUL >"{3}" 2>"{4}""' -f $java, $jarPath, $Port, $stdoutPath, $stderrPath
+    $launcher = Start-Process -FilePath $env:ComSpec -ArgumentList @('/d', '/v:off', '/s', '/c', $command) `
+        -WorkingDirectory $deployRoot -WindowStyle Hidden -PassThru
+    $launchDeadline = (Get-Date).AddSeconds(10)
+    do {
+        $javaChild = Get-CimInstance Win32_Process -Filter "ParentProcessId = $($launcher.Id) AND Name = 'java.exe'" |
+            Where-Object { $_.CommandLine.Contains('"' + $jarPath + '"') } | Select-Object -First 1
+        if ($javaChild) { $app = Get-Process -Id $javaChild.ProcessId -ErrorAction Stop; break }
+        $launcher.Refresh()
+        if ($launcher.HasExited) { throw 'Java launcher exited before startup; check application logs.' }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $launchDeadline)
+    if (-not $app) { throw 'Could not identify the launched Java process.' }
     Set-Content -LiteralPath $pidPath -Value $app.Id
     $deadline = (Get-Date).AddSeconds(90)
     while ((Get-Date) -lt $deadline) {
@@ -63,6 +79,7 @@ try {
     throw 'Spring Boot did not become ready within 90 seconds.'
 } catch {
     if ($app -and -not $app.HasExited) { $app.Kill(); $app.WaitForExit() }
+    if ($launcher -and -not $launcher.HasExited) { $launcher.Kill() }
     if (Test-Path -LiteralPath $pidPath) { Remove-Item -LiteralPath $pidPath }
     throw
 } finally {

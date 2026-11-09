@@ -29,7 +29,12 @@ pipeline {
         }
         stage('Deploy and start Spring Boot') {
             steps {
-                withEnv(['JENKINS_NODE_COOKIE=order-api-service']) {
+                // Explicitly export defaults even on the first build of a new job.
+                withEnv([
+                    'JENKINS_NODE_COOKIE=order-api-service',
+                    "DEPLOY_DIR=${params.DEPLOY_DIR?.trim() ?: 'C:\\apps\\order-api'}",
+                    "APP_PORT=${params.APP_PORT?.trim() ?: '8080'}"
+                ]) {
                     powershell '''
                         & ./scripts/Deploy-SpringBoot.ps1 -DeployDirectory $env:DEPLOY_DIR -Port ([int]$env:APP_PORT)
                     '''
