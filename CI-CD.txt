@@ -1,0 +1,41 @@
+Jenkins CI for Order API
+
+Setup
+1. Commit and push Jenkinsfile and scripts
+   to https://github.com/pfaghihi/QETemp.git.
+2. Create a Pipeline job using "Pipeline script from SCM", Git, that repository,
+   your intended deployment branch, and script path Jenkinsfile. Select a Jenkins
+   Git credential if the repository is private. Checkout uses the job's SCM.
+3. Ensure eligible Jenkins agents have Git and JDK 21 installed.
+   Set JAVA_HOME and PATH for the Jenkins agent account.
+   The Maven wrapper downloads Maven; no Jenkins Maven tool is required.
+4. Install Jenkins Pipeline, Git, JUnit and Timestamper plugins.
+5. Run Build Now. For automatic builds, configure a GitHub webhook pointing to
+   JENKINS_URL/github-webhook/ and enable the job's GitHub hook trigger.
+
+Behavior
+- Checks out the job's GitHub revision and runs Maven clean verify: compilation,
+  tests and executable Spring Boot JAR packaging.
+- Publishes Surefire JUnit reports even if Maven fails; archives successful JARs.
+- Prints build status and console API links.
+- Deployment and application startup are not configured.
+
+Retrieve Jenkins status and logs
+With Python 3 installed, set JENKINS_USER and JENKINS_API_TOKEN in your local
+environment, then run:
+  python scripts/jenkins-build.py http://localhost:8088/job/OrderApi/lastBuild
+Replace OrderApi with the actual job path (folders use /job/FOLDER/job/NAME).
+The script saves status.json and console.log in jenkins-build-output. A running
+build has building=true and result=null; rerun after completion for final logs.
+Use --output PATH to choose a different directory. No credentials are committed.
+
+Verification limits
+Creating these files does not create a Jenkins job or push them to GitHub.
+An authenticated Jenkins run is needed to validate Jenkins plugin configuration
+on the selected agent. VS Code's .vscode/mcp.json is separate
+from Codex's MCP configuration.
+
+References
+https://www.jenkins.io/doc/pipeline/steps/junit/
+https://www.jenkins.io/doc/pipeline/steps/workflow-scm-step/
+https://www.jenkins.io/doc/book/using/remote-access-api/
