@@ -1,0 +1,38 @@
+Jenkins CI/CD setup (Windows, Java 21)
+
+1. Push Jenkinsfile and scripts to https://github.com/pfaghihi/QETemp.git.
+2. Create a Pipeline job with "Pipeline script from SCM", Git, that repository,
+   your deployment branch, and script path Jenkinsfile. Select GitHub credentials
+   in Jenkins if the repository is private. checkout scm uses that configuration.
+3. Label ONE persistent Windows agent order-api-windows. Install Git, JDK 21,
+   Windows PowerShell 5.1 and the NetTCPIP module. Set JAVA_HOME and PATH for
+   the Jenkins agent account. Maven is downloaded using the project wrapper.
+4. Install Pipeline, Git, JUnit and Timestamper Jenkins plugins.
+5. Grant the agent account write access to C:\apps\order-api (or DEPLOY_DIR).
+   Set APP_PORT if 8080 is occupied. Use one deployment job per directory/port.
+6. Run Build Now. For automatic GitHub builds, configure a webhook to
+   JENKINS_URL/github-webhook/ and enable the job's GitHub hook trigger.
+
+The pipeline checks out GitHub, runs Maven clean verify (compile, tests, package),
+publishes Surefire JUnit reports even on failure, and archives the executable JAR.
+Only a successful build proceeds to deployment. It stops its previous Java
+process, copies the JAR outside the workspace, starts it in the background and
+checks /api/orders and port ownership. Startup log tails are archived in Jenkins.
+Full runtime logs remain in DEPLOY_DIR. Build result and API links appear in the
+Jenkins console.
+
+This is a direct-process deployment: replacement causes downtime, there is no
+automatic rollback, and the application does not automatically restart after a
+host reboot or JVM failure. Jenkins must run on a persistent Windows host.
+JENKINS_NODE_COOKIE keeps the application from normal Pipeline process cleanup.
+
+Retrieve build status and console logs from PowerShell:
+Set JENKINS_USER and JENKINS_API_TOKEN in your environment, then run:
+  .\scripts\Get-JenkinsBuild.ps1 -BuildUrl http://localhost:8088/job/OrderApi/lastBuild
+Replace OrderApi with the actual job name. Folder paths use /job/FOLDER/job/NAME.
+Output is saved to jenkins-build-output/status.json and console.log. Rerun after
+completion if building=true; result is null while a build is still running.
+
+The pipeline has not been executed or tested locally. Creating these files does
+not create the Jenkins job or push changes to GitHub. VS Code Jenkins MCP remains
+configured separately in .vscode/mcp.json.
