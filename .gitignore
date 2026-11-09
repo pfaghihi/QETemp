@@ -1,7 +1,5 @@
 HELP.md
 target/
-jenkins-build-output/
-__pycache__/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
