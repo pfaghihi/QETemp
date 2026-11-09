@@ -29,9 +29,21 @@ if (Test-Path -LiteralPath $pidPath) {
         if ($previous.Name -ne 'java.exe' -or -not $previous.CommandLine.Contains('"' + $jarPath + '"')) {
             throw 'Saved PID does not identify this application; refusing to stop it.'
         }
-        Stop-Process -Id $previousPid -ErrorAction Stop
-        Wait-Process -Id $previousPid -Timeout 30 -ErrorAction SilentlyContinue
-        if (Get-Process -Id $previousPid -ErrorAction SilentlyContinue) { throw 'Previous application did not stop.' }
+        $previousProcess = Get-Process -Id $previousPid -ErrorAction SilentlyContinue
+        if ($previousProcess) {
+            try {
+                # An exited process may remain enumerable while another process
+                # holds its handle. Wait for exit instead of requiring PID removal.
+                if (-not $previousProcess.HasExited) {
+                    $previousProcess.Kill()
+                    if (-not $previousProcess.WaitForExit(30000)) {
+                        throw 'Previous application did not stop within 30 seconds.'
+                    }
+                }
+            } finally {
+                $previousProcess.Dispose()
+            }
+        }
     }
     Remove-Item -LiteralPath $pidPath
 }
